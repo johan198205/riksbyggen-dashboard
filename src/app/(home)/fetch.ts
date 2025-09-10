@@ -1,7 +1,11 @@
 export async function getOverviewData() {
   try {
     // Fetch GA4 data from our API endpoint
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3004';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+      (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3004');
+    
+    console.log('Fetching GA4 data from:', `${baseUrl}/api/ga4/metrics?days=28`);
+    
     const response = await fetch(`${baseUrl}/api/ga4/metrics?days=28`, {
       cache: 'no-store', // No caching for live data
     });
