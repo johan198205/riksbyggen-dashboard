@@ -8,7 +8,7 @@ export async function getOverviewData() {
     console.log('Environment check - window:', typeof window !== 'undefined' ? 'available' : 'not available');
     console.log('Running on server-side:', typeof window === 'undefined');
     
-    const response = await fetch(`${baseUrl}/api/ga4/metrics?days=28`, {
+    const response = await fetch(`${baseUrl}/api/ga4/metrics?days=28&includeGrowthRates=true`, {
       cache: 'no-store', // No caching for live data
       headers: {
         'User-Agent': 'Next.js Server-Side Rendering'
@@ -30,24 +30,24 @@ export async function getOverviewData() {
       return getMockData();
     }
 
-    const { sessions, totalUsers, pageviews, averageEngagementTime } = apiData.data;
+    const { sessions, totalUsers, pageviews, averageEngagementTime, growthRates } = apiData.data;
 
     return {
       views: {
         value: pageviews,
-        growthRate: 0.43, // TODO: Calculate actual growth rate from historical data
+        growthRate: growthRates?.pageviews || 0,
       },
       profit: {
         value: Math.round(averageEngagementTime), // Using engagement time as proxy
-        growthRate: 4.35, // TODO: Calculate actual growth rate
+        growthRate: growthRates?.averageEngagementTime || 0,
       },
       products: {
         value: sessions,
-        growthRate: 2.59, // TODO: Calculate actual growth rate
+        growthRate: growthRates?.sessions || 0,
       },
       users: {
         value: totalUsers,
-        growthRate: -0.95, // TODO: Calculate actual growth rate
+        growthRate: growthRates?.totalUsers || 0,
       },
     };
   } catch (error) {

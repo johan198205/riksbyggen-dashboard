@@ -5,6 +5,12 @@ export interface Ga4Metrics {
   totalUsers: number;
   pageviews: number;
   averageEngagementTime: number;
+  growthRates?: {
+    sessions: number;
+    totalUsers: number;
+    pageviews: number;
+    averageEngagementTime: number;
+  };
 }
 
 export interface Ga4MetricsResponse {
@@ -58,7 +64,7 @@ class Ga4ClientEmailService {
     }
   }
 
-  async getMetrics(dateRange: { startDate: string; endDate: string }): Promise<Ga4MetricsResponse> {
+  async getMetrics(dateRange: { startDate: string; endDate: string }, includeGrowthRates: boolean = false): Promise<Ga4MetricsResponse> {
     if (!this.client) {
       return {
         data: { sessions: 0, totalUsers: 0, pageviews: 0, averageEngagementTime: 0 },
@@ -104,19 +110,116 @@ class Ga4ClientEmailService {
         averageEngagementTime = aggregatedData.userEngagementDuration / aggregatedData.sessions;
       }
 
+      const currentData = {
+        sessions: aggregatedData.sessions,
+        totalUsers: aggregatedData.totalUsers,
+        pageviews: aggregatedData.pageviews,
+        averageEngagementTime: Math.round(averageEngagementTime)
+      };
+
+      // Calculate growth rates if requested
+      if (includeGrowthRates) {
+        const growthRates = await this.calculateGrowthRates(dateRange, currentData);
+        return { 
+          data: {
+            ...currentData,
+            growthRates
+          }
+        };
+      }
+
       return { 
-        data: {
-          sessions: aggregatedData.sessions,
-          totalUsers: aggregatedData.totalUsers,
-          pageviews: aggregatedData.pageviews,
-          averageEngagementTime: Math.round(averageEngagementTime)
-        }
+        data: currentData
       };
     } catch (error) {
       console.error('GA4ClientEmailService: Error fetching GA4 metrics:', error);
       return {
         data: { sessions: 0, totalUsers: 0, pageviews: 0, averageEngagementTime: 0 },
         error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  private async calculateGrowthRates(currentDateRange: { startDate: string; endDate: string }, currentData: any) {
+    try {
+      // Calculate previous period (same length as current period)
+      const currentStart = new Date(currentDateRange.startDate);
+      const currentEnd = new Date(currentDateRange.endDate);
+      const periodLength = Math.ceil((currentEnd.getTime() - currentStart.getTime()) / (1000 * 60 * 60 * 24));
+      
+      const previousEnd = new Date(currentStart);
+      previousEnd.setDate(previousEnd.getDate() - 1);
+      const previousStart = new Date(previousEnd);
+      previousStart.setDate(previousStart.getDate() - periodLength + 1);
+
+      const previousDateRange = {
+        startDate: previousStart.toISOString().split('T')[0],
+        endDate: previousEnd.toISOString().split('T')[0]
+      };
+
+      console.log(`GA4ClientEmailService: Calculating growth rates for period ${previousDateRange.startDate} to ${previousDateRange.endDate}`);
+
+      // Fetch previous period data
+      const [response] = await this.client!.runReport({
+        property: `properties/${this.propertyId}`,
+        dateRanges: [previousDateRange],
+        metrics: [
+          { name: 'sessions' },
+          { name: 'totalUsers' },
+          { name: 'screenPageViews' },
+          { name: 'userEngagementDuration' }
+        ]
+      });
+
+      const rows = response.rows || [];
+      if (rows.length === 0) {
+        console.log('GA4ClientEmailService: No previous period data found, returning zero growth rates');
+        return {
+          sessions: 0,
+          totalUsers: 0,
+          pageviews: 0,
+          averageEngagementTime: 0
+        };
+      }
+
+      const previousData = rows.reduce((acc, row) => {
+        const metrics = row.metricValues || [];
+        return {
+          sessions: acc.sessions + parseInt(metrics[0]?.value || '0'),
+          totalUsers: acc.totalUsers + parseInt(metrics[1]?.value || '0'),
+          pageviews: acc.pageviews + parseInt(metrics[2]?.value || '0'),
+          userEngagementDuration: acc.userEngagementDuration + parseFloat(metrics[3]?.value || '0')
+        };
+      }, { sessions: 0, totalUsers: 0, pageviews: 0, userEngagementDuration: 0 });
+
+      let previousAverageEngagementTime = 0;
+      if (previousData.sessions > 0) {
+        previousAverageEngagementTime = previousData.userEngagementDuration / previousData.sessions;
+      }
+
+      // Calculate growth rates
+      const calculateGrowthRate = (current: number, previous: number) => {
+        if (previous === 0) return current > 0 ? 100 : 0;
+        return ((current - previous) / previous) * 100;
+      };
+
+      const growthRates = {
+        sessions: calculateGrowthRate(currentData.sessions, previousData.sessions),
+        totalUsers: calculateGrowthRate(currentData.totalUsers, previousData.totalUsers),
+        pageviews: calculateGrowthRate(currentData.pageviews, previousData.pageviews),
+        averageEngagementTime: calculateGrowthRate(currentData.averageEngagementTime, previousAverageEngagementTime)
+      };
+
+      console.log('GA4ClientEmailService: Growth rates calculated:', growthRates);
+      return growthRates;
+
+    } catch (error) {
+      console.error('GA4ClientEmailService: Error calculating growth rates:', error);
+      return {
+        sessions: 0,
+        totalUsers: 0,
+        pageviews: 0,
+        averageEngagementTime: 0
       };
     }
   }
