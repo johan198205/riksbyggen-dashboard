@@ -34,9 +34,15 @@ class Ga4Service {
   }
 
   private getCredentials() {
+    console.log('Environment check:');
+    console.log('- GA4_PROPERTY_ID:', process.env.GA4_PROPERTY_ID ? 'SET' : 'NOT SET');
+    console.log('- GOOGLE_APPLICATION_CREDENTIALS_JSON:', process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ? 'SET' : 'NOT SET');
+    console.log('- GOOGLE_APPLICATION_CREDENTIALS:', process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'SET' : 'NOT SET');
+
     // Option 1: JSON string from environment variable (production)
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
       try {
+        console.log('Using GOOGLE_APPLICATION_CREDENTIALS_JSON');
         const credentialsJson = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
         return { credentials: credentialsJson };
       } catch (error) {
@@ -46,10 +52,12 @@ class Ga4Service {
 
     // Option 2: File path (development)
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      console.log('Using GOOGLE_APPLICATION_CREDENTIALS file path');
       return { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS };
     }
 
     // Option 3: Default credentials (if running on GCP)
+    console.log('Using default credentials');
     return {};
   }
 
