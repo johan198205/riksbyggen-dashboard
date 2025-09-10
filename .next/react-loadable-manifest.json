@@ -1,0 +1,26 @@
+{
+  "app/(home)/_components/region-labels/index.tsx -> ./map": {
+    "id": "app/(home)/_components/region-labels/index.tsx -> ./map",
+    "files": [
+      "static/chunks/_app-pages-browser_src_app_home__components_region-labels_map_tsx.js"
+    ]
+  },
+  "components/Charts/payments-overview/chart.tsx -> react-apexcharts": {
+    "id": "components/Charts/payments-overview/chart.tsx -> react-apexcharts",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_react-apexcharts_dist_react-apexcharts_min_js.js"
+    ]
+  },
+  "components/Charts/used-devices/chart.tsx -> react-apexcharts": {
+    "id": "components/Charts/used-devices/chart.tsx -> react-apexcharts",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_react-apexcharts_dist_react-apexcharts_min_js.js"
+    ]
+  },
+  "components/Charts/weeks-profit/chart.tsx -> react-apexcharts": {
+    "id": "components/Charts/weeks-profit/chart.tsx -> react-apexcharts",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_react-apexcharts_dist_react-apexcharts_min_js.js"
+    ]
+  }
+}
