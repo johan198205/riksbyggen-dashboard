@@ -1,1 +1,19 @@
 node_modules
+
+# Environment variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# GA4 Service Account
+ga4-service-account.json
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!next.config.mjs
+!tailwind.config.ts
+!postcss.config.js
+!jsvectormap.d.ts
+!next-env.d.ts
