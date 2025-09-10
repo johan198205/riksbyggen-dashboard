@@ -142,22 +142,21 @@ class Ga4ClientEmailService {
 
   private async calculateGrowthRates(currentDateRange: { startDate: string; endDate: string }, currentData: any) {
     try {
-      // Calculate previous period (same length as current period)
+      // Calculate same period 1 year ago (year-over-year comparison)
       const currentStart = new Date(currentDateRange.startDate);
       const currentEnd = new Date(currentDateRange.endDate);
-      const periodLength = Math.ceil((currentEnd.getTime() - currentStart.getTime()) / (1000 * 60 * 60 * 24));
       
-      const previousEnd = new Date(currentStart);
-      previousEnd.setDate(previousEnd.getDate() - 1);
-      const previousStart = new Date(previousEnd);
-      previousStart.setDate(previousStart.getDate() - periodLength + 1);
+      const previousStart = new Date(currentStart);
+      previousStart.setFullYear(previousStart.getFullYear() - 1);
+      const previousEnd = new Date(currentEnd);
+      previousEnd.setFullYear(previousEnd.getFullYear() - 1);
 
       const previousDateRange = {
         startDate: previousStart.toISOString().split('T')[0],
         endDate: previousEnd.toISOString().split('T')[0]
       };
 
-      console.log(`GA4ClientEmailService: Calculating growth rates for period ${previousDateRange.startDate} to ${previousDateRange.endDate}`);
+      console.log(`GA4ClientEmailService: Calculating year-over-year growth rates for period ${previousDateRange.startDate} to ${previousDateRange.endDate}`);
 
       // Fetch previous period data
       const [response] = await this.client!.runReport({
@@ -173,12 +172,12 @@ class Ga4ClientEmailService {
 
       const rows = response.rows || [];
       if (rows.length === 0) {
-        console.log('GA4ClientEmailService: No previous period data found, returning zero growth rates');
+        console.log('GA4ClientEmailService: No previous year data found, returning zero growth rates');
         return {
-          sessions: 0,
-          totalUsers: 0,
-          pageviews: 0,
-          averageEngagementTime: 0
+          sessions: 0.00,
+          totalUsers: 0.00,
+          pageviews: 0.00,
+          averageEngagementTime: 0.00
         };
       }
 
@@ -197,10 +196,10 @@ class Ga4ClientEmailService {
         previousAverageEngagementTime = previousData.userEngagementDuration / previousData.sessions;
       }
 
-      // Calculate growth rates
+      // Calculate growth rates with 2 decimal places
       const calculateGrowthRate = (current: number, previous: number) => {
-        if (previous === 0) return current > 0 ? 100 : 0;
-        return ((current - previous) / previous) * 100;
+        if (previous === 0) return current > 0 ? 100.00 : 0.00;
+        return Math.round(((current - previous) / previous) * 100 * 100) / 100; // Round to 2 decimal places
       };
 
       const growthRates = {
@@ -216,10 +215,10 @@ class Ga4ClientEmailService {
     } catch (error) {
       console.error('GA4ClientEmailService: Error calculating growth rates:', error);
       return {
-        sessions: 0,
-        totalUsers: 0,
-        pageviews: 0,
-        averageEngagementTime: 0
+        sessions: 0.00,
+        totalUsers: 0.00,
+        pageviews: 0.00,
+        averageEngagementTime: 0.00
       };
     }
   }
