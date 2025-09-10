@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ga4HybridService } from '@/services/ga4-hybrid.service';
+import { ga4OAuth2Service } from '@/services/ga4-oauth2.service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const dateRange = ga4HybridService.getDateRange(days);
-    const result = await ga4HybridService.getMetrics(dateRange);
+    const dateRange = ga4OAuth2Service.getDateRange(days);
+    const result = await ga4OAuth2Service.getMetrics(dateRange);
 
     if (result.error) {
       return NextResponse.json(
