@@ -32,7 +32,7 @@ export async function OverviewCardsGroup() {
         label="Avg Engagement Time"
         data={{
           ...profit,
-          value: formatEngagementTime(Math.round(profit.value)),
+          value: formatEngagementTime(profit.value),
         }}
         Icon={icons.Profit}
       />

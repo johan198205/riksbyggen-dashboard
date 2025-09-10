@@ -17,6 +17,8 @@ export async function getOverviewData() {
 
     const apiData = await response.json();
     
+    console.log('GA4 API response:', apiData);
+    
     if (apiData.error) {
       console.warn('GA4 API error:', apiData.error);
       // Fallback to mock data if GA4 fails
