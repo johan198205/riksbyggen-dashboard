@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ga4OAuth2Service } from '@/services/ga4-oauth2.service';
+import { ga4ClientEmailService } from '@/services/ga4-client-email.service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const dateRange = ga4OAuth2Service.getDateRange(days);
-    const result = await ga4OAuth2Service.getMetrics(dateRange);
+    const dateRange = ga4ClientEmailService.getDateRange(days);
+    const result = await ga4ClientEmailService.getMetrics(dateRange);
 
     if (result.error) {
       return NextResponse.json(
