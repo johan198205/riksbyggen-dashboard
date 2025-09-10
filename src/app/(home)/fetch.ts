@@ -1,15 +1,18 @@
 export async function getOverviewData() {
   try {
-    // Fetch GA4 data from our API endpoint
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-      (typeof window !== 'undefined' ? window.location.origin : 'https://riksbyggen-dashboard.vercel.app');
+    // For server-side rendering, we need to use the full URL
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://riksbyggen-dashboard.vercel.app';
     
     console.log('Fetching GA4 data from:', `${baseUrl}/api/ga4/metrics?days=28`);
     console.log('Environment check - NEXT_PUBLIC_BASE_URL:', process.env.NEXT_PUBLIC_BASE_URL);
     console.log('Environment check - window:', typeof window !== 'undefined' ? 'available' : 'not available');
+    console.log('Running on server-side:', typeof window === 'undefined');
     
     const response = await fetch(`${baseUrl}/api/ga4/metrics?days=28`, {
       cache: 'no-store', // No caching for live data
+      headers: {
+        'User-Agent': 'Next.js Server-Side Rendering'
+      }
     });
 
     if (!response.ok) {
