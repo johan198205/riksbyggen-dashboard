@@ -2,9 +2,11 @@ export async function getOverviewData() {
   try {
     // Fetch GA4 data from our API endpoint
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-      (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3004');
+      (typeof window !== 'undefined' ? window.location.origin : 'https://riksbyggen-dashboard.vercel.app');
     
     console.log('Fetching GA4 data from:', `${baseUrl}/api/ga4/metrics?days=28`);
+    console.log('Environment check - NEXT_PUBLIC_BASE_URL:', process.env.NEXT_PUBLIC_BASE_URL);
+    console.log('Environment check - window:', typeof window !== 'undefined' ? 'available' : 'not available');
     
     const response = await fetch(`${baseUrl}/api/ga4/metrics?days=28`, {
       cache: 'no-store', // No caching for live data
