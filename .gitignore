@@ -17,3 +17,7 @@ ga4-service-account.json
 !postcss.config.js
 !jsvectormap.d.ts
 !next-env.d.ts
+
+# Production environment files
+.env.production
+.env.production.local

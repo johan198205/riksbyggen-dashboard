@@ -25,12 +25,32 @@ class Ga4Service {
     }
 
     try {
-      this.client = new BetaAnalyticsDataClient({
-        keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-      });
+      // Handle both file path and JSON string credentials
+      const credentials = this.getCredentials();
+      this.client = new BetaAnalyticsDataClient(credentials);
     } catch (error) {
       console.error('Failed to initialize GA4 client:', error);
     }
+  }
+
+  private getCredentials() {
+    // Option 1: JSON string from environment variable (production)
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+      try {
+        const credentialsJson = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+        return { credentials: credentialsJson };
+      } catch (error) {
+        console.error('Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:', error);
+      }
+    }
+
+    // Option 2: File path (development)
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      return { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS };
+    }
+
+    // Option 3: Default credentials (if running on GCP)
+    return {};
   }
 
   async getMetrics(dateRange: { startDate: string; endDate: string }): Promise<Ga4MetricsResponse> {
