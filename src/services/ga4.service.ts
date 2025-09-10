@@ -27,6 +27,7 @@ class Ga4Service {
     try {
       // Handle both file path and JSON string credentials
       const credentials = this.getCredentials();
+      console.log('Initializing GA4 client with credentials:', credentials ? 'FOUND' : 'NOT FOUND');
       this.client = new BetaAnalyticsDataClient(credentials);
     } catch (error) {
       console.error('Failed to initialize GA4 client:', error);

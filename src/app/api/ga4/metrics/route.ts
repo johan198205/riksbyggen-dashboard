@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ga4Service } from '@/services/ga4.service';
+import { ga4VercelService } from '@/services/ga4-vercel.service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const dateRange = ga4Service.getDateRange(days);
-    const result = await ga4Service.getMetrics(dateRange);
+    const dateRange = ga4VercelService.getDateRange(days);
+    const result = await ga4VercelService.getMetrics(dateRange);
 
     if (result.error) {
       return NextResponse.json(
