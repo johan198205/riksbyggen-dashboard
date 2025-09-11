@@ -4,6 +4,8 @@ import { compactFormat } from "@/lib/format-number";
 import { useGa4Stream } from "@/hooks/use-ga4-stream";
 import { OverviewCard } from "./card";
 import * as icons from "./icons";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 function formatEngagementTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -18,6 +20,27 @@ function formatEngagementTime(seconds: number): string {
 
 export function RealtimeOverviewCardsGroup() {
   const { data, isConnected, error, isLoading } = useGa4Stream(28, true);
+  const [selectedMetric, setSelectedMetric] = useState<string>('pageviews');
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Get selected metric from URL params
+    const metricParam = searchParams.get('selected_metric');
+    if (metricParam && ['pageviews', 'sessions', 'users', 'engagement'].includes(metricParam)) {
+      setSelectedMetric(metricParam);
+    }
+  }, [searchParams]);
+
+  const handleMetricSelect = (metric: string) => {
+    setSelectedMetric(metric);
+    
+    // Update URL with selected metric
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('selected_metric', metric);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   if (isLoading) {
     return (
@@ -61,6 +84,9 @@ export function RealtimeOverviewCardsGroup() {
           growthRate: growthRates?.pageviews || 0,
         }}
         Icon={icons.Views}
+        metricType="pageviews"
+        isSelected={selectedMetric === 'pageviews'}
+        onClick={() => handleMetricSelect('pageviews')}
       />
 
       <OverviewCard
@@ -70,6 +96,9 @@ export function RealtimeOverviewCardsGroup() {
           growthRate: growthRates?.averageEngagementTime || 0,
         }}
         Icon={icons.Profit}
+        metricType="engagement"
+        isSelected={selectedMetric === 'engagement'}
+        onClick={() => handleMetricSelect('engagement')}
       />
 
       <OverviewCard
@@ -79,6 +108,9 @@ export function RealtimeOverviewCardsGroup() {
           growthRate: growthRates?.sessions || 0,
         }}
         Icon={icons.Product}
+        metricType="sessions"
+        isSelected={selectedMetric === 'sessions'}
+        onClick={() => handleMetricSelect('sessions')}
       />
 
       <OverviewCard
@@ -88,6 +120,9 @@ export function RealtimeOverviewCardsGroup() {
           growthRate: growthRates?.totalUsers || 0,
         }}
         Icon={icons.Users}
+        metricType="users"
+        isSelected={selectedMetric === 'users'}
+        onClick={() => handleMetricSelect('users')}
       />
       
       {/* Connection status indicator */}

@@ -18,6 +18,20 @@ export interface Ga4MetricsResponse {
   error?: string;
 }
 
+export interface Ga4TimeSeriesData {
+  date: string;
+  value: number;
+}
+
+export interface Ga4TimeSeriesResponse {
+  current: Ga4TimeSeriesData[];
+  previousYear: Ga4TimeSeriesData[];
+  error?: string;
+}
+
+export type Ga4MetricType = 'pageviews' | 'sessions' | 'users' | 'engagement';
+export type Ga4Granularity = 'DAY' | 'WEEK' | 'MONTH';
+
 class Ga4ClientEmailService {
   private client: BetaAnalyticsDataClient | null = null;
   private propertyId: string;
@@ -221,6 +235,108 @@ class Ga4ClientEmailService {
         averageEngagementTime: 0.00
       };
     }
+  }
+
+  async getTimeSeries(
+    metric: Ga4MetricType,
+    startDate: string,
+    endDate: string,
+    granularity: Ga4Granularity = 'DAY'
+  ): Promise<Ga4TimeSeriesResponse> {
+    if (!this.client) {
+      return {
+        current: [],
+        previousYear: [],
+        error: 'GA4 client not initialized'
+      };
+    }
+
+    try {
+      console.log(`GA4ClientEmailService: Fetching time series for metric: ${metric}, period: ${startDate} to ${endDate}, granularity: ${granularity}`);
+
+      // Map metric types to GA4 API metric names
+      const metricMap: Record<Ga4MetricType, string> = {
+        pageviews: 'screenPageViews',
+        sessions: 'sessions',
+        users: 'totalUsers',
+        engagement: 'userEngagementDuration'
+      };
+
+      const ga4Metric = metricMap[metric];
+
+      // Get current period data
+      const currentData = await this.fetchTimeSeriesData(startDate, endDate, ga4Metric, granularity);
+      
+      // Calculate previous year period
+      const currentStart = new Date(startDate);
+      const currentEnd = new Date(endDate);
+      const previousStart = new Date(currentStart);
+      previousStart.setFullYear(previousStart.getFullYear() - 1);
+      const previousEnd = new Date(currentEnd);
+      previousEnd.setFullYear(previousEnd.getFullYear() - 1);
+
+      const previousStartStr = previousStart.toISOString().split('T')[0];
+      const previousEndStr = previousEnd.toISOString().split('T')[0];
+
+      // Get previous year data
+      const previousData = await this.fetchTimeSeriesData(previousStartStr, previousEndStr, ga4Metric, granularity);
+
+      // For engagement metric, calculate average per session
+      if (metric === 'engagement') {
+        const currentSessions = await this.fetchTimeSeriesData(startDate, endDate, 'sessions', granularity);
+        const previousSessions = await this.fetchTimeSeriesData(previousStartStr, previousEndStr, 'sessions', granularity);
+        
+        const currentWithAvg = currentData.map((item, index) => ({
+          ...item,
+          value: currentSessions[index]?.value > 0 ? item.value / currentSessions[index].value : 0
+        }));
+
+        const previousWithAvg = previousData.map((item, index) => ({
+          ...item,
+          value: previousSessions[index]?.value > 0 ? item.value / previousSessions[index].value : 0
+        }));
+
+        return {
+          current: currentWithAvg,
+          previousYear: previousWithAvg
+        };
+      }
+
+      return {
+        current: currentData,
+        previousYear: previousData
+      };
+
+    } catch (error) {
+      console.error('GA4ClientEmailService: Error fetching time series:', error);
+      return {
+        current: [],
+        previousYear: [],
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  private async fetchTimeSeriesData(
+    startDate: string,
+    endDate: string,
+    metric: string,
+    granularity: Ga4Granularity
+  ): Promise<Ga4TimeSeriesData[]> {
+    const [response] = await this.client!.runReport({
+      property: `properties/${this.propertyId}`,
+      dateRanges: [{ startDate, endDate }],
+      metrics: [{ name: metric }],
+      dimensions: [{ name: 'date' }],
+      orderBys: [{ dimension: { dimensionName: 'date' } }]
+    });
+
+    const rows = response.rows || [];
+    
+    return rows.map(row => ({
+      date: row.dimensionValues?.[0]?.value || '',
+      value: parseFloat(row.metricValues?.[0]?.value || '0')
+    }));
   }
 
   getDateRange(days: number = 30): { startDate: string; endDate: string } {

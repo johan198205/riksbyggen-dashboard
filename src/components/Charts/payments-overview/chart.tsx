@@ -6,21 +6,26 @@ import dynamic from "next/dynamic";
 
 type PropsType = {
   data: {
-    received: { x: unknown; y: number }[];
-    due: { x: unknown; y: number }[];
+    current: { x: string; y: number }[];
+    previousYear: { x: string; y: number }[];
   };
+  metricType?: string;
+  isLoading?: boolean;
+  error?: string;
 };
 
 const Chart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
 });
 
-export function PaymentsOverviewChart({ data }: PropsType) {
+export function PaymentsOverviewChart({ data, metricType, isLoading, error }: PropsType) {
   const isMobile = useIsMobile();
 
   const options: ApexOptions = {
     legend: {
-      show: false,
+      show: true,
+      position: 'top',
+      horizontalAlign: 'right',
     },
     colors: ["#5750F1", "#0ABEF9"],
     chart: {
@@ -85,18 +90,39 @@ export function PaymentsOverviewChart({ data }: PropsType) {
     },
   };
 
+  if (isLoading) {
+    return (
+      <div className="-ml-4 -mr-5 h-[310px] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+          <p className="text-sm text-gray-500">Loading chart data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="-ml-4 -mr-5 h-[310px] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-sm text-red-500">Error loading chart data: {error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="-ml-4 -mr-5 h-[310px]">
       <Chart
         options={options}
         series={[
           {
-            name: "Received",
-            data: data.received,
+            name: "Current Year",
+            data: data.current,
           },
           {
-            name: "Due",
-            data: data.due,
+            name: "Previous Year",
+            data: data.previousYear,
           },
         ]}
         type="area"
