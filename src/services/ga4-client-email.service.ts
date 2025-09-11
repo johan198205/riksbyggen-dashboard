@@ -37,42 +37,68 @@ class Ga4ClientEmailService {
   private propertyId: string;
 
   constructor() {
-    this.propertyId = process.env.GA4_PROPERTY_ID || '';
+    this.propertyId = process.env.GA4_PROPERTY_ID || '249591466';
     
     if (!this.propertyId) {
       console.error('GA4_PROPERTY_ID environment variable is not set');
       return;
     }
 
+    console.log('GA4ClientEmailService: Using property ID:', this.propertyId);
     this.initializeClient();
   }
 
   private initializeClient() {
     try {
+      // Try multiple authentication methods
+      let credentials = null;
+
+      // Method 1: Try environment variables first
       const clientEmail = process.env.GA4_CLIENT_EMAIL;
       const privateKey = process.env.GA4_PRIVATE_KEY;
 
-      if (!clientEmail || !privateKey) {
-        console.error('GA4_CLIENT_EMAIL or GA4_PRIVATE_KEY environment variables are not set');
-        return;
+      if (clientEmail && privateKey) {
+        console.log('GA4ClientEmailService: Using environment variables for authentication');
+        credentials = {
+          type: 'service_account',
+          project_id: 'riksbyggen-dashboard',
+          private_key_id: 'b03a7a150d4e172c9b9e52c0b69e91c4daef933f',
+          private_key: privateKey.replace(/\\n/g, '\n'),
+          client_email: clientEmail,
+          client_id: '106839702533684506886',
+          auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+          token_uri: 'https://oauth2.googleapis.com/token',
+          auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+          client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(clientEmail)}`,
+          universe_domain: 'googleapis.com'
+        };
+      } else {
+        // Method 2: Try to load from service account file
+        console.log('GA4ClientEmailService: Environment variables not found, trying service account file');
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const serviceAccountPath = path.join(process.cwd(), 'ga4-service-account.json');
+          
+          if (fs.existsSync(serviceAccountPath)) {
+            const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+            console.log('GA4ClientEmailService: Using service account file for authentication');
+            credentials = serviceAccount;
+          } else {
+            console.error('GA4ClientEmailService: Service account file not found at:', serviceAccountPath);
+          }
+        } catch (fileError) {
+          console.error('GA4ClientEmailService: Error reading service account file:', fileError);
+        }
       }
 
-      // Create credentials object from environment variables
-      const credentials = {
-        type: 'service_account',
-        project_id: 'your-project-id', // This can be extracted from client_email if needed
-        private_key_id: 'key-id', // Optional
-        private_key: privateKey.replace(/\\n/g, '\n'), // Replace \n with actual newlines
-        client_email: clientEmail,
-        client_id: 'client-id', // Optional
-        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-        token_uri: 'https://oauth2.googleapis.com/token',
-        auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
-        client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(clientEmail)}`
-      };
-
-      console.log('GA4ClientEmailService: Initializing with client email:', clientEmail);
-      this.client = new BetaAnalyticsDataClient({ credentials });
+      if (credentials) {
+        console.log('GA4ClientEmailService: Initializing with credentials');
+        this.client = new BetaAnalyticsDataClient({ credentials });
+        console.log('GA4ClientEmailService: Client initialized successfully');
+      } else {
+        console.error('GA4ClientEmailService: No valid credentials found');
+      }
     } catch (error) {
       console.error('GA4ClientEmailService: Failed to initialize GA4 client:', error);
     }
