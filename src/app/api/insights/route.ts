@@ -372,7 +372,9 @@ export async function POST(request: NextRequest) {
 
     // Generate AI insights
     try {
+      console.log('Attempting to call OpenAI...');
       const insights = await callOpenAI(features, metric, dateRange);
+      console.log('OpenAI call successful, returning insights');
       return NextResponse.json(insights);
     } catch (openAIError) {
       console.error('OpenAI error, returning fallback insights:', openAIError);
@@ -400,6 +402,7 @@ export async function POST(request: NextRequest) {
         confidence: 'low'
       };
       
+      console.log('Returning fallback insights');
       return NextResponse.json(fallbackInsights);
     }
 

@@ -1,4 +1,4 @@
-import { ArrowDownIcon, ArrowUpIcon } from "@/assets/icons";
+import { ArrowDownIcon, ArrowUpIcon, AIIcon } from "@/assets/icons";
 import { cn } from "@/lib/utils";
 import type { JSX, SVGProps } from "react";
 
@@ -12,14 +12,23 @@ type PropsType = {
   metricType?: 'pageviews' | 'sessions' | 'users' | 'engagement';
   isSelected?: boolean;
   onClick?: () => void;
+  onAIClick?: () => void;
+  isLoading?: boolean;
 };
 
-export function OverviewCard({ label, data, Icon, metricType, isSelected, onClick }: PropsType) {
+export function OverviewCard({ label, data, Icon, metricType, isSelected, onClick, onAIClick, isLoading = false }: PropsType) {
   const isDecreasing = data.growthRate < 0;
 
   const handleClick = () => {
     if (onClick && metricType) {
       onClick();
+    }
+  };
+
+  const handleAIClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onAIClick) {
+      onAIClick();
     }
   };
 
@@ -42,12 +51,28 @@ export function OverviewCard({ label, data, Icon, metricType, isSelected, onClic
         }
       }}
     >
-      <Icon />
+      <div className="flex items-center justify-between">
+        <Icon />
+        {onAIClick && (
+          <button
+            onClick={handleAIClick}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+            aria-label={`AI insights for ${label}`}
+            title={`AI insights for ${label}`}
+          >
+            <AIIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          </button>
+        )}
+      </div>
 
       <div className="mt-6 flex items-end justify-between">
         <dl>
           <dt className="mb-1.5 text-heading-6 font-bold text-dark dark:text-white">
-            {data.value}
+            {isLoading ? (
+              <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            ) : (
+              data.value
+            )}
           </dt>
 
           <dd className="text-sm font-medium text-dark-6">{label}</dd>
@@ -56,21 +81,31 @@ export function OverviewCard({ label, data, Icon, metricType, isSelected, onClic
         <dl
           className={cn(
             "text-sm font-medium",
-            isDecreasing ? "text-red" : "text-green",
+            !isLoading && (isDecreasing ? "text-red" : "text-green"),
           )}
         >
           <dt className="flex items-center gap-1.5">
-            {data.growthRate}%
-            {isDecreasing ? (
-              <ArrowDownIcon aria-hidden />
+            {isLoading ? (
+              <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
             ) : (
-              <ArrowUpIcon aria-hidden />
+              <>
+                {data.growthRate}%
+                {isDecreasing ? (
+                  <ArrowDownIcon aria-hidden />
+                ) : (
+                  <ArrowUpIcon aria-hidden />
+                )}
+              </>
             )}
           </dt>
 
           <dd className="sr-only">
-            {label} {isDecreasing ? "Decreased" : "Increased"} by{" "}
-            {data.growthRate}%
+            {!isLoading && (
+              <>
+                {label} {isDecreasing ? "Decreased" : "Increased"} by{" "}
+                {data.growthRate}%
+              </>
+            )}
           </dd>
         </dl>
       </div>

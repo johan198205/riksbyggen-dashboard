@@ -7,6 +7,8 @@ import * as icons from "./icons";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { InsightsSidebar } from "@/components/InsightsSidebar";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { insightsPrefetcher } from "@/lib/insights-prefetcher";
 
 function formatEngagementTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -20,7 +22,21 @@ function formatEngagementTime(seconds: number): string {
 }
 
 export function RealtimeOverviewCardsGroup() {
-  const { data, isConnected, error, isLoading } = useGa4Stream(28, true);
+  // Calculate days from date range
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>(() => {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - 28); // Default to 28 days
+    return {
+      start: startDate.toISOString().split('T')[0],
+      end: endDate.toISOString().split('T')[0]
+    };
+  });
+  
+  // Calculate days from date range
+  const days = Math.ceil((new Date(dateRange.end).getTime() - new Date(dateRange.start).getTime()) / (1000 * 60 * 60 * 24));
+  
+  const { data, isConnected, error, isLoading } = useGa4Stream(days, true);
   const [selectedMetric, setSelectedMetric] = useState<string>('pageviews');
   const [insightsSidebar, setInsightsSidebar] = useState<{
     isOpen: boolean;
@@ -31,6 +47,7 @@ export function RealtimeOverviewCardsGroup() {
     metric: '',
     metricLabel: ''
   });
+  const [prefetchStatus, setPrefetchStatus] = useState<Record<string, 'idle' | 'loading' | 'completed' | 'error'>>({});
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -41,7 +58,57 @@ export function RealtimeOverviewCardsGroup() {
     if (metricParam && ['pageviews', 'sessions', 'users', 'engagement'].includes(metricParam)) {
       setSelectedMetric(metricParam);
     }
+    
+    // Get date range from URL params
+    const dateRangeParam = searchParams.get('date_range');
+    if (dateRangeParam) {
+      const [start, end] = dateRangeParam.split(',');
+      if (start && end) {
+        setDateRange({ start, end });
+      }
+    }
   }, [searchParams]);
+
+  // Prefetch insights ONLY after GA4 data is loaded
+  useEffect(() => {
+    if (!data) return; // Don't start AI prefetching until we have real data
+    
+    const prefetchInsights = async () => {
+      console.log('Starting insights prefetch for date range:', dateRange);
+      
+      const metrics = ['pageviews', 'sessions', 'users', 'engagement'];
+      const result = await insightsPrefetcher.prefetchInsights({
+        dateRange,
+        granularity: 'DAY',
+        metrics,
+        onProgress: (metric, status) => {
+          setPrefetchStatus(prev => ({
+            ...prev,
+            [metric]: status === 'started' ? 'loading' : status === 'completed' ? 'completed' : 'error'
+          }));
+        }
+      });
+
+      console.log('Prefetch result:', result);
+    };
+
+    // Start AI prefetching only after we have real GA4 data
+    prefetchInsights();
+  }, [dateRange, data]);
+
+  const handleDateRangeChange = (newDateRange: { start: string; end: string }) => {
+    console.log('Date range changed:', newDateRange);
+    setDateRange(newDateRange);
+    
+    // Update URL params to include date range
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('date_range', `${newDateRange.start},${newDateRange.end}`);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    
+    // Invalidate cache for old date range and start prefetching for new range
+    insightsPrefetcher.invalidateCache(dateRange);
+    setPrefetchStatus({});
+  };
 
   const handleMetricSelect = (metric: string) => {
     setSelectedMetric(metric);
@@ -68,119 +135,45 @@ export function RealtimeOverviewCardsGroup() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4 2xl:gap-7.5">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="animate-pulse">
-            <div className="rounded-lg border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-1/4"></div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    // Show fallback data when GA4 is not available
-    const fallbackData = {
-      sessions: 1250,
-      totalUsers: 980,
-      pageviews: 3450,
-      averageEngagementTime: 180,
-      growthRates: {
-        sessions: 12.5,
-        totalUsers: 8.3,
-        pageviews: 15.2,
-        averageEngagementTime: 5.7
-      }
-    };
-
-    return (
-      <>
-        <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4 2xl:gap-7.5">
-          <OverviewCard
-            label="Pageviews"
-            data={{
-              value: compactFormat(fallbackData.pageviews),
-              growthRate: fallbackData.growthRates.pageviews,
-            }}
-            Icon={icons.Views}
-            metricType="pageviews"
-            isSelected={selectedMetric === 'pageviews'}
-            onClick={() => handleMetricSelect('pageviews')}
-            onAIClick={() => handleAIClick('pageviews', 'Pageviews')}
-          />
-
-          <OverviewCard
-            label="Avg Engagement Time"
-            data={{
-              value: formatEngagementTime(fallbackData.averageEngagementTime),
-              growthRate: fallbackData.growthRates.averageEngagementTime,
-            }}
-            Icon={icons.Profit}
-            metricType="engagement"
-            isSelected={selectedMetric === 'engagement'}
-            onClick={() => handleMetricSelect('engagement')}
-            onAIClick={() => handleAIClick('engagement', 'Avg Engagement Time')}
-          />
-
-          <OverviewCard
-            label="Sessions"
-            data={{
-              value: compactFormat(fallbackData.sessions),
-              growthRate: fallbackData.growthRates.sessions,
-            }}
-            Icon={icons.Product}
-            metricType="sessions"
-            isSelected={selectedMetric === 'sessions'}
-            onClick={() => handleMetricSelect('sessions')}
-            onAIClick={() => handleAIClick('sessions', 'Sessions')}
-          />
-
-          <OverviewCard
-            label="Total Users"
-            data={{
-              value: compactFormat(fallbackData.totalUsers),
-              growthRate: fallbackData.growthRates.totalUsers,
-            }}
-            Icon={icons.Users}
-            metricType="users"
-            isSelected={selectedMetric === 'users'}
-            onClick={() => handleMetricSelect('users')}
-            onAIClick={() => handleAIClick('users', 'Total Users')}
-          />
-        </div>
-
-        {/* Error notification */}
-        <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-center dark:border-yellow-800 dark:bg-yellow-900/20">
-          <p className="text-yellow-600 dark:text-yellow-400">
-            {error || 'GA4 client not initialized'}
-          </p>
-          <p className="text-sm text-yellow-500 dark:text-yellow-500 mt-1">
-            Connection status: {isConnected ? 'Connected' : 'Disconnected'} • Showing demo data
-          </p>
-        </div>
-      </>
-    );
-  }
-
-  const { sessions, totalUsers, pageviews, averageEngagementTime, growthRates } = data.data;
-
-  // Get current date range (last 28 days)
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - 28);
-  const dateRange = {
-    start: startDate.toISOString().split('T')[0],
-    end: endDate.toISOString().split('T')[0]
+  // Use real GA4 data if available, otherwise use fallback values
+  const { sessions, totalUsers, pageviews, averageEngagementTime, growthRates } = data?.data || {
+    sessions: 0,
+    totalUsers: 0,
+    pageviews: 0,
+    averageEngagementTime: 0,
+    growthRates: {
+      sessions: 0,
+      totalUsers: 0,
+      pageviews: 0,
+      averageEngagementTime: 0
+    }
   };
+
 
   return (
     <>
+      {/* Date Range Picker and AI Status */}
+      <div className="mb-6 flex justify-between items-center">
+        <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                     {data && Object.values(prefetchStatus).some(status => status === 'loading') && (
+                       <>
+                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                         <span>AI insights loading in background... (this may take up to {Math.max(60, days)} seconds for {days} days)</span>
+                       </>
+                     )}
+          {data && Object.values(prefetchStatus).every(status => status === 'completed') && (
+            <>
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span>AI insights ready</span>
+            </>
+          )}
+        </div>
+        <DateRangePicker
+          value={dateRange}
+          onChange={handleDateRangeChange}
+        />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4 2xl:gap-7.5">
         <OverviewCard
           label="Pageviews"
@@ -193,6 +186,7 @@ export function RealtimeOverviewCardsGroup() {
           isSelected={selectedMetric === 'pageviews'}
           onClick={() => handleMetricSelect('pageviews')}
           onAIClick={() => handleAIClick('pageviews', 'Pageviews')}
+          isLoading={isLoading || !data}
         />
 
         <OverviewCard
@@ -206,6 +200,7 @@ export function RealtimeOverviewCardsGroup() {
           isSelected={selectedMetric === 'engagement'}
           onClick={() => handleMetricSelect('engagement')}
           onAIClick={() => handleAIClick('engagement', 'Avg Engagement Time')}
+          isLoading={isLoading || !data}
         />
 
         <OverviewCard
@@ -219,6 +214,7 @@ export function RealtimeOverviewCardsGroup() {
           isSelected={selectedMetric === 'sessions'}
           onClick={() => handleMetricSelect('sessions')}
           onAIClick={() => handleAIClick('sessions', 'Sessions')}
+          isLoading={isLoading || !data}
         />
 
         <OverviewCard
@@ -232,16 +228,17 @@ export function RealtimeOverviewCardsGroup() {
           isSelected={selectedMetric === 'users'}
           onClick={() => handleMetricSelect('users')}
           onAIClick={() => handleAIClick('users', 'Total Users')}
+          isLoading={isLoading || !data}
         />
         
         {/* Connection status indicator */}
         <div className="col-span-4 flex justify-center items-center space-x-2 text-sm">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          <span className={isConnected ? 'text-green-600' : 'text-red-600'}>
-            {isConnected ? 'Live data' : 'Disconnected'}
+          <div className={`w-2 h-2 rounded-full ${isConnected && data ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+          <span className={isConnected && data ? 'text-green-600' : 'text-yellow-600'}>
+            {isConnected && data ? 'Live data' : 'Loading data...'}
           </span>
           <span className="text-gray-500">
-            Last updated: {new Date(data.timestamp).toLocaleTimeString()}
+            {data ? `Last updated: ${new Date(data.timestamp).toLocaleTimeString()}` : 'Connecting to GA4...'}
           </span>
         </div>
       </div>

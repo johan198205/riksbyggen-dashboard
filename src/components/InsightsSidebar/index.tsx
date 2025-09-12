@@ -3,13 +3,8 @@
 import { useState, useEffect } from 'react';
 import { XIcon } from '@/assets/icons';
 import { cn } from '@/lib/utils';
-
-interface InsightData {
-  summaryMarkdown: string;
-  actions: string[];
-  anomalies: string[];
-  confidence: 'low' | 'medium' | 'high';
-}
+import { insightsPrefetcher } from '@/lib/insights-prefetcher';
+import type { InsightData } from '@/lib/insights-cache';
 
 interface InsightsSidebarProps {
   isOpen: boolean;
@@ -34,15 +29,69 @@ export function InsightsSidebar({
 
   useEffect(() => {
     if (isOpen && metric) {
-      fetchInsights();
+      loadInsights();
     }
   }, [isOpen, metric, dateRange, granularity]);
+
+  const loadInsights = async () => {
+    // First, try to get cached insights
+    const cachedInsights = insightsPrefetcher.getCachedInsights(metric, dateRange, granularity);
+    
+    if (cachedInsights) {
+      console.log('Using cached insights for', metric);
+      setInsights(cachedInsights);
+      setError(null);
+      return;
+    }
+
+    // Check if prefetching is in progress
+    if (insightsPrefetcher.isPrefetchingMetric(metric, dateRange, granularity)) {
+      console.log('Prefetching in progress for', metric, '- showing loading state');
+      setIsLoading(true);
+      setError(null);
+      
+      // Poll for completion
+      const pollInterval = setInterval(() => {
+        const cached = insightsPrefetcher.getCachedInsights(metric, dateRange, granularity);
+        if (cached) {
+          setInsights(cached);
+          setIsLoading(false);
+          clearInterval(pollInterval);
+        } else if (!insightsPrefetcher.isPrefetchingMetric(metric, dateRange, granularity)) {
+          // Prefetch completed but no data - fetch directly
+          fetchInsights();
+          clearInterval(pollInterval);
+        }
+      }, 500);
+
+      // Cleanup after 10 seconds
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (isLoading) {
+          fetchInsights();
+        }
+      }, 10000);
+
+      return;
+    }
+
+    // No cache and no prefetch - fetch directly
+    fetchInsights();
+  };
 
   const fetchInsights = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
+      console.log(`Direct fetch insights for ${metric}...`);
+      
+      // Add timeout to prevent hanging - longer timeout for longer date ranges
+      const controller = new AbortController();
+      const days = Math.ceil((new Date(dateRange.end).getTime() - new Date(dateRange.start).getTime()) / (1000 * 60 * 60 * 24));
+      const timeoutMs = Math.max(60000, days * 1000); // At least 60s, plus 1s per day
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      
       const response = await fetch('/api/insights', {
         method: 'POST',
         headers: {
@@ -53,16 +102,31 @@ export function InsightsSidebar({
           dateRange,
           granularity,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch insights: ${response.status}`);
       }
 
       const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      console.log(`Successfully fetched insights for ${metric}`);
       setInsights(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch insights');
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        const days = Math.ceil((new Date(dateRange.end).getTime() - new Date(dateRange.start).getTime()) / (1000 * 60 * 60 * 24));
+        const timeoutMs = Math.max(60000, days * 1000);
+        setError(`Request timeout (${timeoutMs/1000}s) - AI analysis for ${days} days is taking longer than expected. Please try again.`);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch insights');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -144,7 +208,7 @@ export function InsightsSidebar({
                 )}
                 <button
                   onClick={fetchInsights}
-                  className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                  className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
                 >
                   Try again
                 </button>

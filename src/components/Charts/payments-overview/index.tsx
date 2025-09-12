@@ -38,13 +38,32 @@ export function PaymentsOverview({
 
       try {
         // Get date range based on timeFrame
-        const days = timeFrame === 'yearly' ? 365 : 30;
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(endDate.getDate() - days);
-
-        const startDateStr = startDate.toISOString().split('T')[0];
-        const endDateStr = endDate.toISOString().split('T')[0];
+        let startDateStr: string;
+        let endDateStr: string;
+        
+        if (timeFrame === 'selected_date_range') {
+          // Get date range from URL params or use default
+          const dateRangeParam = searchParams.get('date_range');
+          if (dateRangeParam) {
+            const [start, end] = dateRangeParam.split(',');
+            startDateStr = start;
+            endDateStr = end;
+          } else {
+            // Default to 28 days if no date range specified
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(endDate.getDate() - 28);
+            startDateStr = startDate.toISOString().split('T')[0];
+            endDateStr = endDate.toISOString().split('T')[0];
+          }
+        } else {
+          const days = timeFrame === 'yearly' ? 365 : 30;
+          const endDate = new Date();
+          const startDate = new Date();
+          startDate.setDate(endDate.getDate() - days);
+          startDateStr = startDate.toISOString().split('T')[0];
+          endDateStr = endDate.toISOString().split('T')[0];
+        }
 
         // Fetch GA4 time series data
         const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001';
@@ -119,7 +138,7 @@ export function PaymentsOverview({
     };
 
     fetchChartData();
-  }, [selectedMetric, timeFrame]);
+  }, [selectedMetric, timeFrame, searchParams]);
 
   const getMetricTitle = () => {
     const titles: Record<string, string> = {
@@ -153,7 +172,11 @@ export function PaymentsOverview({
           <h2 className="text-body-2xlg font-bold text-dark dark:text-white">
             {getMetricTitle()}
           </h2>
-          <PeriodPicker defaultValue={timeFrame} sectionKey="payments_overview" />
+          <PeriodPicker 
+            defaultValue={timeFrame} 
+            sectionKey="payments_overview" 
+            items={["monthly", "yearly", "selected_date_range"]}
+          />
         </div>
         <div className="h-[310px] flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -174,7 +197,11 @@ export function PaymentsOverview({
           {getMetricTitle()}
         </h2>
 
-        <PeriodPicker defaultValue={timeFrame} sectionKey="payments_overview" />
+        <PeriodPicker 
+          defaultValue={timeFrame} 
+          sectionKey="payments_overview" 
+          items={["monthly", "yearly", "selected_date_range"]}
+        />
       </div>
 
       <PaymentsOverviewChart 
